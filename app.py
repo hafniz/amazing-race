@@ -715,4 +715,4 @@ if __name__ == "__main__":
     # for normal local testing use this run
     #app.run(ssl_context="adhoc",host='127.0.0.1', port=port, debug=True)
     # for deployment to heroku app use this
-    app.run(host='0.0.0.0', port=port, debug=True)
+    #app.run(host='0.0.0.0', port=port, debug=True)

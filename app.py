@@ -6,6 +6,7 @@ import csv
 import random
 import subprocess
 import datetime
+import zipfile
 
 # Third-party libraries
 from flask import Flask, render_template, redirect, request, url_for
@@ -62,7 +63,7 @@ def unauthorized_callback():
 @app.route("/")
 def index():
     if current_user.is_authenticated:
-        connection = sqlite3.connect("sqlite_db")
+        connection = sqlite3.connect("database.db")
         cursor = connection.cursor()
         cursor.execute("SELECT mainstage, bonus0, bonus1, bonus2, bonus3 FROM progress WHERE email='{}'".format(current_user.email))
         progress = cursor.fetchone()
@@ -93,7 +94,7 @@ def stage_demo():
             return render_template("stage-1.html", correct=correct)
 
 #STAGE 0: Cyber Security, KEY: protecc
-connection = sqlite3.connect("sqlite_db")
+connection = sqlite3.connect("database.db")
 cursor = connection.cursor()
 cursor.execute("SELECT * FROM stage0questions")
 STAGE0_QUESTIONS = cursor.fetchall()
@@ -103,7 +104,7 @@ connection.close()
 @login_required
 def stage0_main():
     if request.method == "GET":
-        connection = sqlite3.connect("sqlite_db")
+        connection = sqlite3.connect("database.db")
         cursor = connection.cursor()
         cursor.execute("SELECT * FROM stage0 WHERE email='{}'".format(current_user.email))
         stage0_progress = cursor.fetchone()
@@ -124,7 +125,7 @@ def stage0_main():
         for question in STAGE0_QUESTIONS:
             if question[0] == qn:
                 if ans == question[6]: # correct
-                    connection = sqlite3.connect("sqlite_db")
+                    connection = sqlite3.connect("database.db")
                     connection.execute("UPDATE stage0 SET {}=1 WHERE email='{}'".format(question[0], current_user.email))
                     connection.commit()
                     connection.close()
@@ -137,7 +138,7 @@ def stage0_main():
 
 
 #STAGE 1: PYTHON BASICS, KEY: nextdoor
-connection = sqlite3.connect("sqlite_db")
+connection = sqlite3.connect("database.db")
 cursor = connection.cursor()
 cursor.execute("SELECT * FROM stage1questions")
 STAGE1_QUESTIONS = cursor.fetchall()
@@ -146,7 +147,7 @@ connection.close()
 @app.route("/stage1", methods=["GET", "POST"])
 @login_required
 def stage1():
-    connection = sqlite3.connect("sqlite_db")
+    connection = sqlite3.connect("database.db")
     cursor = connection.cursor()
     cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
     maxstage = cursor.fetchone()[0]
@@ -154,9 +155,10 @@ def stage1():
     
     if maxstage < 1:
         return redirect("/submit")
+    
     else:
         if request.method == "GET":
-            connection = sqlite3.connect("sqlite_db")
+            connection = sqlite3.connect("database.db")
             cursor = connection.cursor()
             cursor.execute("SELECT * FROM stage1 WHERE email='{}'".format(current_user.email))
             stage1_progress = cursor.fetchone()
@@ -178,7 +180,7 @@ def stage1():
             for question in STAGE1_QUESTIONS:
                 if question[0] == qn:
                     if ans == question[2]: # correct
-                        connection = sqlite3.connect("sqlite_db")
+                        connection = sqlite3.connect("database.db")
                         connection.execute("UPDATE stage1 SET {}=1 WHERE email='{}'".format(question[0], current_user.email))
                         connection.commit()
                         connection.close()
@@ -191,67 +193,77 @@ def stage1():
 @app.route("/stage1/q4", methods=["GET", "POST"])
 @login_required
 def stage1_q4():
-    if request.method == "GET":
-        connection = sqlite3.connect("sqlite_db")
-        cursor = connection.cursor()
-        cursor.execute("SELECT * FROM stage1 WHERE email='{}'".format(current_user.email))
-        stage1_progress = cursor.fetchone()
-        connection.close()
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+    cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
+    maxstage = cursor.fetchone()[0]
+    connection.close()
+    
+    if maxstage < 1:
+        return redirect("/submit")
+    
+    else:
+        if request.method == "GET":
+            connection = sqlite3.connect("database.db")
+            cursor = connection.cursor()
+            cursor.execute("SELECT * FROM stage1 WHERE email='{}'".format(current_user.email))
+            stage1_progress = cursor.fetchone()
+            connection.close()
 
-        for i in range(1, 4):
-            if stage1_progress[i] == 0:
-                return redirect("/stage1")
+            for i in range(1, 4):
+                if stage1_progress[i] == 0:
+                    return redirect("/stage1")
 
-        if stage1_progress[4] == 1:
-            return render_template("stage1_success.html")
+            if stage1_progress[4] == 1:
+                return render_template("stage1_success.html")
+
+            else:
+                question = STAGE1_QUESTIONS[3]
+                return render_template("stage1_q4.html", question=question, progress=3)
 
         else:
-            question = STAGE1_QUESTIONS[3]
-            return render_template("stage1_q4.html", question=question, progress=3)
-
-    else:
-        qn = request.form.get("qn")
-        code = request.form.get("code")
-        progress = request.form.get("progress")
-        
-        if code:
-            # prevent user for accessing files
-            if "open" in code or "file" in code:
-                output = "No trying to open files!"
-                return render_template("stage1_q4.html", code=code, error=output, question=STAGE1_QUESTIONS[3], progress=progress)
+            qn = request.form.get("qn")
+            code = request.form.get("code")
+            progress = request.form.get("progress")
             
-            else:
-                with open("toiletpaper/toiletpaper.py", 'w') as file:
-                    file.write("import sys\nsys.modules['os']=None\nsys.modules['sqlite3']=None\nsys.modules['flask']=None\nsys.modules['subprocess']=None\nsys.modules['sys']=None\ndel sys\n") # prevent importing os and sqlite3
-                    file.write(code)
-
-                
-                toiletinput = open("toiletpaper/toiletpaper.in")
-                try:
-                    output = subprocess.check_output(["python", "toiletpaper/toiletpaper.py"], timeout=1,stdin=toiletinput).decode("utf-8")
-                except subprocess.TimeoutExpired:
-                    output = "Time Limit Exceed. Is your code stuck in an infinite loop? Or is it inefficient?"
-                    return render_template("stage1_q4.html", code=code, error=output, question=STAGE1_QUESTIONS[3], progress=progress)
-                except subprocess.CalledProcessError:
-                    output = "There's an error in your code."
+            if code:
+                # prevent user for accessing files
+                if "open" in code or "file" in code:
+                    output = "No trying to open files!"
                     return render_template("stage1_q4.html", code=code, error=output, question=STAGE1_QUESTIONS[3], progress=progress)
                 
-                output = output.split("\n")
-                output = output[0].replace("\r", "")
+                else:
+                    with open("toiletpaper/toiletpaper.py", 'w') as file:
+                        file.write("import sys\nsys.modules['os']=None\nsys.modules['sqlite3']=None\nsys.modules['flask']=None\nsys.modules['subprocess']=None\nsys.modules['sys']=None\ndel sys\n") # prevent importing os and sqlite3
+                        file.write(code)
 
-                # check answers
-                for question in STAGE1_QUESTIONS:
-                    if question[0] == qn:
-                        if output == question[2]: # correct
-                            connection = sqlite3.connect("sqlite_db")
-                            connection.execute("UPDATE stage1 SET {}=1 WHERE email='{}'".format(question[0], current_user.email))
-                            connection.commit()
-                            connection.close()
-                            return render_template("stage1_success.html")
+                    
+                    toiletinput = open("toiletpaper/toiletpaper.in")
+                    try:
+                        output = subprocess.check_output(["python", "toiletpaper/toiletpaper.py"], timeout=1,stdin=toiletinput).decode("utf-8")
+                    except subprocess.TimeoutExpired:
+                        output = "Time Limit Exceed. Is your code stuck in an infinite loop? Or is it inefficient?"
+                        return render_template("stage1_q4.html", code=code, error=output, question=STAGE1_QUESTIONS[3], progress=progress)
+                    except subprocess.CalledProcessError:
+                        output = "There's an error in your code."
+                        return render_template("stage1_q4.html", code=code, error=output, question=STAGE1_QUESTIONS[3], progress=progress)
+                    
+                    output = output.split("\n")
+                    output = output[0].replace("\r", "")
 
-                        else:
-                            output = "Wrong Answer! Ps: How many days are there?"
-                            return render_template("stage1_q4.html", code=code, error=output, question=question, progress=progress)
+                    # check answers
+                    for question in STAGE1_QUESTIONS:
+                        if question[0] == qn:
+                            if output == question[2]: # correct
+                                connection = sqlite3.connect("database.db")
+                                connection.execute("UPDATE stage1 SET {}=1 WHERE email='{}'".format(question[0], current_user.email))
+                                connection.commit()
+                                connection.close()
+                                return render_template("stage1_success.html")
+
+                            else:
+                                output = "Wrong Answer! Ps: How many days are there?"
+                                return render_template("stage1_q4.html", code=code, error=output, question=question, progress=progress)
 
 
 
@@ -260,7 +272,7 @@ def stage1_q4():
 
 
 #STAGE 2: COMPUTATIONAL THINKING, KEY: bigbraintime
-connection = sqlite3.connect("sqlite_db")
+connection = sqlite3.connect("database.db")
 cursor = connection.cursor()
 cursor.execute("SELECT * FROM stage2questions")
 STAGE2_QUESTIONS = cursor.fetchall()
@@ -269,7 +281,7 @@ connection.close()
 @app.route("/stage2", methods=["GET", "POST"])
 @login_required
 def stage2():
-    connection = sqlite3.connect("sqlite_db")
+    connection = sqlite3.connect("database.db")
     cursor = connection.cursor()
     cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
     maxstage = cursor.fetchone()[0]
@@ -280,7 +292,7 @@ def stage2():
 
     else:
         if request.method == "GET":
-            connection = sqlite3.connect("sqlite_db")
+            connection = sqlite3.connect("database.db")
             cursor = connection.cursor()
             cursor.execute("SELECT * FROM stage2 WHERE email='{}'".format(current_user.email))
             stage2_progress = cursor.fetchone()
@@ -300,7 +312,7 @@ def stage2():
             for question in STAGE2_QUESTIONS:
                 if question[0] == qn:
                     if ans == question[2]: # correct
-                        connection = sqlite3.connect("sqlite_db")
+                        connection = sqlite3.connect("database.db")
                         connection.execute("UPDATE stage2 SET {}=1 WHERE email='{}'".format(question[0], current_user.email))
                         connection.commit()
                         connection.close()
@@ -314,7 +326,7 @@ def stage2():
 
 #STAGE 3: SQL, KEY: hi3
 
-connection = sqlite3.connect("sqlite_db")
+connection = sqlite3.connect("database.db")
 cursor = connection.cursor()
 cursor.execute("SELECT * FROM stage3questions")
 STAGE3_QUESTIONS = cursor.fetchall()
@@ -323,7 +335,7 @@ connection.close()
 @app.route("/stage3", methods=["GET", "POST"])
 @login_required
 def stage3():
-    connection = sqlite3.connect("sqlite_db")
+    connection = sqlite3.connect("database.db")
     cursor = connection.cursor()
     cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
     maxstage = cursor.fetchone()[0]
@@ -334,7 +346,7 @@ def stage3():
 
     else:
         if request.method == "GET":
-            connection = sqlite3.connect("sqlite_db")
+            connection = sqlite3.connect("database.db")
             cursor = connection.cursor()
             cursor.execute("SELECT * FROM stage3 WHERE email='{}'".format(current_user.email))
             stage3_progress = cursor.fetchone()
@@ -357,7 +369,7 @@ def stage3():
                 if question[0] == qn:
                     #print("A")
                     if ans == question[3]: # correct
-                        connection = sqlite3.connect("sqlite_db")
+                        connection = sqlite3.connect("database.db")
                         connection.execute("UPDATE stage3 SET {}=1 WHERE email='{}'".format(question[0], current_user.email))
                         connection.commit()
                         connection.close()
@@ -373,7 +385,7 @@ def stage3():
 @app.route("/stage4")
 @login_required
 def stage4():
-    connection = sqlite3.connect("sqlite_db")
+    connection = sqlite3.connect("database.db")
     cursor = connection.cursor()
     cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
     maxstage = cursor.fetchone()[0]
@@ -389,67 +401,68 @@ def stage4():
 @app.route("/stage5", methods=["GET", "POST"])
 @login_required
 def stage5():
-    if request.method == "GET":
-        connection = sqlite3.connect("sqlite_db")
-        cursor = connection.cursor()
-        cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
-        maxstage = cursor.fetchone()[0]
-        connection.close()
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+    cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
+    maxstage = cursor.fetchone()[0]
+    connection.close()
 
-        if maxstage < 5:
-            return redirect("/submit")
-        return render_template("stage5.html")
-    
+    if maxstage < 5:
+        return redirect("/submit")
     else:
-        code = request.form.get("code")
-        if code:
-            # prevent user for accessing files
-            if "open" in code or "file" in code:
-                output = "No trying to open files!"
-                return render_template("stage5.html", code=code, error=output)
-            
-            else:
-                subtasks = []
-
-                with open("castle/castle.py", 'w') as file:
-                    file.write("import sys\nsys.modules['os']=None\nsys.modules['sqlite3']=None\nsys.modules['flask']=None\nsys.modules['subprocess']=None\nsys.modules['sys']=None\ndel sys\n") # prevent importing os and sqlite3
-                    file.write(code)
-
-                for i in range(3):
-                    castleInput = open("castle/castle-{}.in".format(i))
-                    try:
-                        output = subprocess.check_output(["python", "castle/castle.py"], timeout=1, stdin=castleInput).decode("utf-8")
-                    except subprocess.TimeoutExpired:
-                        output = "Time Limit Exceed. Is your code stuck in an infinite loop? Or is it inefficient?"
-                        return render_template("stage5.html", code=code, error=output)
-                    except subprocess.CalledProcessError:
-                        output = "There's an error in your code."
-                        return render_template("stage5.html", code=code, error=output)
-                    
-                    # check answers
-                    with open("castle/castle-ans-{}.txt".format(i), 'r') as file:
-                        ans = list(file)
-                    
-                    output = output.split("\n")
-                    n = len(output) - 1
-                    if n != len(ans):
-                        subtasks.append(False)
-                    
-                    else:
-                        correct = True
-                        for i in range(n):
-                            output[i].strip()
-                            output[i] = output[i].replace("\r", "")
-
-                            if output[i] != ans[i].strip():
-                                correct = False
-
-                        subtasks.append(correct)
-
-                return render_template("stage5.html", code=code, userans=output, subtasks=subtasks)
-        
-        else: # empty input
+        if request.method == "GET":
             return render_template("stage5.html")
+        
+        else:
+            code = request.form.get("code")
+            if code:
+                # prevent user for accessing files
+                if "open" in code or "file" in code:
+                    output = "No trying to open files!"
+                    return render_template("stage5.html", code=code, error=output)
+                
+                else:
+                    subtasks = []
+
+                    with open("castle/castle.py", 'w') as file:
+                        file.write("import sys\nsys.modules['os']=None\nsys.modules['sqlite3']=None\nsys.modules['flask']=None\nsys.modules['subprocess']=None\nsys.modules['sys']=None\ndel sys\n") # prevent importing os and sqlite3
+                        file.write(code)
+
+                    for i in range(3):
+                        castleInput = open("castle/castle-{}.in".format(i))
+                        try:
+                            output = subprocess.check_output(["python", "castle/castle.py"], timeout=1, stdin=castleInput).decode("utf-8")
+                        except subprocess.TimeoutExpired:
+                            output = "Time Limit Exceed. Is your code stuck in an infinite loop? Or is it inefficient?"
+                            return render_template("stage5.html", code=code, error=output)
+                        except subprocess.CalledProcessError:
+                            output = "There's an error in your code."
+                            return render_template("stage5.html", code=code, error=output)
+                        
+                        # check answers
+                        with open("castle/castle-ans-{}.txt".format(i), 'r') as file:
+                            ans = list(file)
+                        
+                        output = output.split("\n")
+                        n = len(output) - 1
+                        if n != len(ans):
+                            subtasks.append(False)
+                        
+                        else:
+                            correct = True
+                            for i in range(n):
+                                output[i].strip()
+                                output[i] = output[i].replace("\r", "")
+
+                                if output[i] != ans[i].strip():
+                                    correct = False
+
+                            subtasks.append(correct)
+
+                    return render_template("stage5.html", code=code, userans=output, subtasks=subtasks)
+            
+            else: # empty input
+                return render_template("stage5.html")
 
 
 
@@ -457,7 +470,7 @@ def stage5():
 @app.route("/stage6")
 @login_required
 def stage6():
-    connection = sqlite3.connect("sqlite_db")
+    connection = sqlite3.connect("database.db")
     cursor = connection.cursor()
     cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
     maxstage = cursor.fetchone()[0]
@@ -473,10 +486,106 @@ def stage6():
 
 
 #STAGE 7: HTML / CSS, KEY: hi7
-@app.route("/stage7")
+connection = sqlite3.connect("database.db")
+cursor = connection.cursor()
+cursor.execute("SELECT * FROM stage7questions")
+STAGE7_QUESTIONS = cursor.fetchall()
+connection.close()
+
+@app.route("/stage7", methods=["GET", "POST"])
 @login_required
 def stage7():
-    return render_template("stage7.html")
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+    cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
+    maxstage = cursor.fetchone()[0]
+    connection.close()
+
+    if maxstage < 7:
+        return redirect("/submit")
+
+    else:
+        if request.method == "GET":
+            connection = sqlite3.connect("database.db")
+            cursor = connection.cursor()
+            cursor.execute("SELECT * FROM stage7 WHERE email='{}'".format(current_user.email))
+            stage7_progress = cursor.fetchone()
+            connection.close()
+
+            for i in range(1, 7):
+                if stage7_progress[i] == 0:
+                    return render_template("stage7.html", question=STAGE7_QUESTIONS[i-1], code=STAGE7_QUESTIONS[i-1][2], progress=i-1)
+
+            return render_template("stage7_success.html")
+        
+        else:
+            qn = request.form.get("qn")
+            code = request.form.get("code")
+
+            userans = "".join(code.split())
+            userans = userans.lower()
+
+            if qn == "q1": # question 1
+                pos = []
+                tags = ["<!doctypehtml>", "<html>", "<head>", "<title>", "</title>", "</head>", "<body>", "<h1>", "</h1>", "<h2>", "</h2>", "<p>", "</p>", "</body>", "</html>"]
+
+                for tag in tags:
+                    temp = userans.find(tag)
+                    if temp == -1: # incorrect
+                        return render_template("stage7.html", question=STAGE7_QUESTIONS[0], code=code, progress=0, correct=False)
+
+                    pos.append(temp)
+
+                if pos == sorted(pos): # correct
+                    connection = sqlite3.connect("database.db")
+                    connection.execute("UPDATE stage7 SET q1=1 WHERE email=(?)", (current_user.email,))
+                    connection.commit()
+                    connection.close()
+
+                    return redirect("/stage7")
+
+                else: # incorrect
+                    return render_template("stage7.html", question=STAGE7_QUESTIONS[0], code=code, progress=0, correct=False)
+
+            elif qn == "q2": # question 2:
+                if userans.find("body{font-family:'inconsolata',monospace;}") == -1 and userans.find("body{font-family:\"inconsolata\",monospace;}") == -1: # incorrect
+                    return render_template("stage7.html", question=STAGE7_QUESTIONS[1], code=code, progress=1, correct=False)
+
+                else:
+                    if userans.find("body{font-family:'inconsolata',monospace;}") != -1:
+                        body = userans.find("body{font-family:'inconsolata',monospace;}")
+                    else:
+                        body = userans.find("body{font-family:\"inconsolata\",monospace;}")
+                    
+                    h1 = userans.find("h1{font-size:24px;}")
+                    p = userans.find("p{color:red;}")
+                    
+                    pos = []
+                    tags = ["<!doctypehtml>", "<html>", "<head>", "<style>", "</style>" "</head>", "<body>", "</body>", "</html>"]
+
+                    for tag in tags:
+                        temp = userans.find(tag)
+                        print(tag, temp)
+                        if temp == -1: # incorrect
+                            return render_template("stage7.html", question=STAGE7_QUESTIONS[1], code=code, progress=1, correct=False)
+                        
+                        pos.append(temp)
+
+                    if pos == sorted(pos) and body > pos[3] and h1 > pos[3] and p > pos[3] and body < pos[4] and h1 < pos[4] and p < pos[4]: # correct
+                        connection = sqlite3.connect("database.db")
+                        connection.execute("UPDATE stage7 SET q2=1 WHERE email=(?)", (current_user.email,))
+                        connection.commit()
+                        connection.close()
+
+                        return redirect("/stage7")
+
+                    else: # incorrect
+                        return render_template("stage7.html", question=STAGE7_QUESTIONS[1], code=code, progress=1, correct=False)
+
+
+
+                
+                
 
 
 
@@ -484,7 +593,7 @@ def stage7():
 @app.route("/bonus0", methods=["GET", "POST"])
 @login_required
 def bonus0():
-    connection = sqlite3.connect("sqlite_db")
+    connection = sqlite3.connect("database.db")
     cursor = connection.cursor()
     cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
     maxstage = cursor.fetchone()[0]
@@ -501,7 +610,7 @@ def bonus0():
             ans = request.form.get("ans")
 
             if ans == "Guido van Rossum":
-                connection = sqlite3.connect("sqlite_db")
+                connection = sqlite3.connect("database.db")
                 connection.execute("UPDATE progress SET bonus0=(?) WHERE email=(?)", (datetime.datetime.now(), current_user.email))
                 connection.commit()
                 connection.close()
@@ -541,7 +650,7 @@ def bonus1():
 @login_required
 def bonus2():
     if request.method == "GET":
-        connection = sqlite3.connect("sqlite_db")
+        connection = sqlite3.connect("database.db")
         cursor = connection.cursor()
         cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
         maxstage = cursor.fetchone()[0]
@@ -598,7 +707,7 @@ def bonus2():
                         subtasks.append(correct)
 
                 if subtasks[0] == True and subtasks[1] == True:
-                    connection = sqlite3.connect("sqlite_db")
+                    connection = sqlite3.connect("database.db")
                     connection.execute("UPDATE progress SET bonus2=(?) WHERE email=(?)", (datetime.datetime.now(), current_user.email))
                     connection.commit()
                     connection.close()
@@ -616,17 +725,6 @@ def bonus2():
 def bonus3():
     pass
 
-@app.route("/scoreboard")
-@login_required
-def scoreboard():
-    connection = sqlite3.connect("sqlite_db")
-    cursor = connection.cursor()
-    cursor.execute("SELECT * FROM progress")
-    data = cursor.fetchall()
-    connection.close()
-
-    return render_template("scoreboard.html", data=data)
-
 @app.route("/submit", methods=["GET", "POST"])
 @login_required
 def submit():
@@ -636,7 +734,7 @@ def submit():
     else:
         userpsw = request.form.get("psw")
 
-        connection = sqlite3.connect("sqlite_db")
+        connection = sqlite3.connect("database.db")
         cursor = connection.cursor()
         cursor.execute("SELECT mainstage FROM progress WHERE email='{}'".format(current_user.email))
         maxstage = cursor.fetchone()[0]
@@ -654,6 +752,23 @@ def submit():
             connection.close()
             return render_template("submit.html", success=False)
 
+@app.route("/leaderboard")
+@login_required
+def leaderboard():
+    connection = sqlite3.connect("database.db")
+    cursor = connection.cursor()
+    cursor.execute("SELECT email, mainstage, bonus0, bonus1, bonus2, bonus3 FROM progress ORDER BY mainstage DESC, main7 ASC, main6 ASC, main5 ASC, main4 ASC, main3 ASC, main2 ASC, main1 ASC, main0 ASC")
+    data = cursor.fetchall()
+    connection.close()
+
+    n = len(data)
+    for i in range(n):
+        if data[i][0] == current_user.email:
+            pos = i+1
+            break
+
+    return render_template("leaderboard.html", data=data, pos=pos)
+
 ADMINS = ["alexander.liswandy@dhs.sg", "gu.boyuan@dhs.sg", "zhang.yuxiang@dhs.sg"]
 
 @app.route("/admin", methods=["GET", "POST"])
@@ -664,7 +779,7 @@ def admin():
             return redirect("/")
 
         else:
-            connection = sqlite3.connect("sqlite_db")
+            connection = sqlite3.connect("database.db")
             cursor = connection.cursor()
             cursor.execute("SELECT * FROM progress ORDER BY mainstage DESC, main7 ASC, main6 ASC, main5 ASC, main4 ASC, main3 ASC, main2 ASC, main1 ASC, main0 ASC")
             data = cursor.fetchall()
@@ -676,7 +791,7 @@ def admin():
         email = request.form.get("email")
         newpassword = request.form.get("newpassword")
 
-        connection = sqlite3.connect("sqlite_db")
+        connection = sqlite3.connect("database.db")
         connection.execute("UPDATE progress SET psw=(?) WHERE email=(?)", (newpassword, email))
         connection.commit()
 
@@ -778,6 +893,6 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))
     # for normal local testing use this run
-    app.run(ssl_context="adhoc",host='127.0.0.1', port=port, debug=True)
+    #app.run(ssl_context="adhoc",host='127.0.0.1', port=port, debug=True)
     # for deployment to heroku app use this
-    #app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=True)

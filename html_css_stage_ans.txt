@@ -126,8 +126,7 @@ q4: Comments: (/*should be None */) (/*should be None */)
 				background-color: #f7f1e3;
 			}
 			
-			ul {
-				list-style: none; 
+			ol {
 				padding: 0;  
 				font-size: 18px;
 			}
@@ -136,11 +135,11 @@ q4: Comments: (/*should be None */) (/*should be None */)
 	
 	<body>
 		<h1>Table of contents</h1>
-			<ul>
+			<ol>
 				<li>Introduction</li>
 				<li>TheRootsofHTML</li>
 				<li>Beingamarkuplanguage</li>
-			</ul>	
+			</ol>	
 		<h1>Introduction</h1>
 		<p1>
 			This is a brief extract from an article that explores the first and most fundamental technology used in 
@@ -199,8 +198,7 @@ q5:  Comments: (<!-- Some people may choose to end the para, add the word link, 
 				background-color: #f7f1e3;
 			}
 			
-			ul{
-				list-style: none;
+			ol{
 				padding: 0;
 				font-size: 18px;
 			}
@@ -209,11 +207,11 @@ q5:  Comments: (<!-- Some people may choose to end the para, add the word link, 
 	
 	<body>
 		<h1>Table of contents</h1>
-		<ul>
+		<ol>
 			<li>Introduction</li>
 			<li>The Roots of HTML</li>
 			<li>Being a markup language</li>
-		</ul>
+		</ol>
 		<h1>Introduction</h1>
 		<p1>
 			This is a brief extract from an 
@@ -267,7 +265,7 @@ q6: Comments: (/*Extra </body> at the end*/)
 <html>
 	<head>
 		<title>Book</title>
-		<linkhref="https://fonts.googleapis.com/css?family=Inconsolata&display=swap"rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css?family=Inconsolata&display=swap"rel="stylesheet">
 		<style>
 			body {
 				font-family:'Inconsolata',monospace;
@@ -281,8 +279,7 @@ q6: Comments: (/*Extra </body> at the end*/)
 				background-color:#f7f1e3;
 			}
 			
-			ul { 
-				list-style:none;
+			ol { 
 				padding:0;
 				font-size:18px;
 			}
@@ -291,11 +288,11 @@ q6: Comments: (/*Extra </body> at the end*/)
 	</head>
 	<body>
 	<h1>Tableofcontents</h1>
-	<ul>
+	<ol>
 		<li>Introduction</li>
 		<li>TheRootsofHTML</li>
 		<li>Beingamarkuplanguage</li>
-	</ul>
+	</ol>
 	<h1>Introduction</h1>
 	<p1>
 		This is a brief extract from an 
@@ -335,8 +332,7 @@ q6: Comments: (/*Extra </body> at the end*/)
 	<br>
     <!--Thank you for your help!
     Add a picture below this line:--->
-	<img src="stage7/italic_tag.jpg" alt="HTMLirl">
-	</body>
+	<img src="static/images/stage7/italic_tag.jpg" alt="HTMLirl">
 	</body>
 </html>
 
